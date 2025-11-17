@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./lembrancas-api
+      dockerfile: Dockerfile
+    container_name: lembrancas-api
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist database file
+      - ./lembrancas-api/habits.db:/app/habits.db
+    environment:
+      - DB_DSN=habits.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - lembrancas-network
+
+  frontend:
+    build:
+      context: ./lembrancas
+      dockerfile: Dockerfile
+    container_name: lembrancas-frontend
+    ports:
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+      - "8081:8081"
+    volumes:
+      # Mount source code for hot reload
+      - ./lembrancas:/app
+      - /app/node_modules
+    environment:
+      - EXPO_PUBLIC_API_URL=http://localhost:8080/api
+      - NODE_ENV=development
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - lembrancas-network
+
+networks:
+  lembrancas-network:
+    driver: bridge
+
