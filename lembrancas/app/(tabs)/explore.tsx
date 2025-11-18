@@ -116,22 +116,6 @@ export default function StatisticsScreen() {
                 <View style={styles.statsGrid}>
                   <Surface style={styles.statBox} elevation={1}>
                     <Text variant="displaySmall" style={styles.statNumber}>
-                      {totalStats.totalCompletions}
-                    </Text>
-                    <Text variant="bodyMedium" style={styles.statLabel}>
-                      Total de Conclusões
-                    </Text>
-                  </Surface>
-                  <Surface style={styles.statBox} elevation={1}>
-                    <Text variant="displaySmall" style={styles.statNumber}>
-                      {totalStats.maxStreak}
-                    </Text>
-                    <Text variant="bodyMedium" style={styles.statLabel}>
-                      Maior Sequência
-                    </Text>
-                  </Surface>
-                  <Surface style={styles.statBox} elevation={1}>
-                    <Text variant="displaySmall" style={styles.statNumber}>
                       {totalStats.activeHabits}
                     </Text>
                     <Text variant="bodyMedium" style={styles.statLabel}>
@@ -144,6 +128,22 @@ export default function StatisticsScreen() {
                     </Text>
                     <Text variant="bodyMedium" style={styles.statLabel}>
                       Total de Hábitos
+                    </Text>
+                  </Surface>
+                  <Surface style={styles.statBox} elevation={1}>
+                    <Text variant="displaySmall" style={styles.statNumber}>
+                      {totalStats.totalCompletions}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.statLabel}>
+                      Total de Conclusões
+                    </Text>
+                  </Surface>
+                  <Surface style={styles.statBox} elevation={1}>
+                    <Text variant="displaySmall" style={styles.statNumber}>
+                      {totalStats.maxStreak}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.statLabel}>
+                      Maior Sequência
                     </Text>
                   </Surface>
                 </View>
@@ -266,11 +266,11 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
   },
   statBox: {
-    flex: 1,
-    minWidth: '45%',
+    width: '48%',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',

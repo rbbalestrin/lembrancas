@@ -1,9 +1,11 @@
 import AddHabitDialog from '@/components/AddHabitDialog';
+import EmojiRain from '@/components/EmojiRain';
 import { completeHabit, createHabit, getHabitCompletions, getHabits, removeCompletion } from '@/services/api';
 import { Habit, HabitFrequency } from '@/types/habit';
+import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Button, Checkbox, Divider, FAB, List, Snackbar, Text } from 'react-native-paper';
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Button, Divider, FAB, IconButton, List, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Helper function to get today's date in YYYY-MM-DD format
@@ -65,6 +67,17 @@ export default function HabitsScreen() {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [showEmojiRain, setShowEmojiRain] = useState(false);
+
+  const triggerCelebration = useCallback(() => {
+    // 1. Haptic feedback (only on native platforms)
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    
+    // 2. Emoji rain
+    setShowEmojiRain(true);
+  }, []);
 
   const loadHabits = useCallback(async (date: string) => {
     console.log('[loadHabits] Starting with date:', date);
@@ -171,12 +184,18 @@ export default function HabitsScreen() {
         try {
           await completeHabit(habitId, { date: selectedDate });
           setCompletedHabits((prev) => new Set(prev).add(habitId));
-          setSnackbarMessage('Hábito marcado como completo!');
+          setSnackbarMessage('Hábito marcado como completo! 🎉');
+          
+          // Trigger celebration effects
+          triggerCelebration();
         } catch (error) {
           // Handle 409 Conflict (already completed) gracefully
           if (error instanceof Error && 'status' in error && (error as any).status === 409) {
             setCompletedHabits((prev) => new Set(prev).add(habitId));
             setSnackbarMessage('Hábito já estava completo');
+            
+            // Trigger celebration even for already completed
+            triggerCelebration();
           } else {
             throw error;
           }
@@ -237,8 +256,9 @@ export default function HabitsScreen() {
           icon="chevron-left"
           mode="text"
           onPress={handlePreviousDay}
-          style={styles.dateNavButton}
-        />
+          style={styles.dateNavButton}>
+          {''}
+        </Button>
         <View style={styles.dateDisplayContainer}>
           <Text variant="titleMedium" style={styles.dateText}>
             {formatDateForDisplay(selectedDate)}
@@ -258,8 +278,9 @@ export default function HabitsScreen() {
           icon="chevron-right"
           mode="text"
           onPress={handleNextDay}
-          style={styles.dateNavButton}
-        />
+          style={styles.dateNavButton}>
+          {''}
+        </Button>
       </View>
       <Divider />
 
@@ -289,8 +310,10 @@ export default function HabitsScreen() {
                 const isCompleted = completedHabits.has(habit.id);
                 console.log(`[Render] Habit ${habit.name} (${habit.id}) - isCompleted: ${isCompleted}, selectedDate: ${selectedDate}`);
                 return (
-                  <Checkbox
-                    status={isCompleted ? 'checked' : 'unchecked'}
+                  <IconButton
+                    icon={isCompleted ? 'check-circle' : 'checkbox-blank-circle-outline'}
+                    iconColor={habit.color}
+                    size={24}
                     onPress={() => handleToggleComplete(habit.id)}
                     disabled={togglingIds.has(habit.id)}
                   />
@@ -313,6 +336,13 @@ export default function HabitsScreen() {
         duration={3000}>
         {snackbarMessage}
       </Snackbar>
+      {showEmojiRain && (
+        <EmojiRain
+          onComplete={() => {
+            setShowEmojiRain(false);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
