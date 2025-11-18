@@ -3,7 +3,7 @@ import EmojiRain from '@/components/EmojiRain';
 import { completeHabit, createHabit, getHabitCompletions, getHabits, removeCompletion } from '@/services/api';
 import { Habit, HabitFrequency } from '@/types/habit';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Divider, FAB, IconButton, List, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -47,15 +47,44 @@ const isCompletionForDate = (completionDate: string, selectedDate: string): bool
   // Extract YYYY-MM-DD from completionDate (which may be in ISO format like "2025-11-17T00:00:00Z")
   const completionDateStr = completionDate.split('T')[0];
   // selectedDate is already in YYYY-MM-DD format
-  const matches = completionDateStr === selectedDate;
-  console.log('[isCompletionForDate]', {
-    completionDate,
-    completionDateStr,
-    selectedDate,
-    matches,
-  });
-  return matches;
+  return completionDateStr === selectedDate;
 };
+
+// Memoized color indicator component
+const ColorIndicator = memo(({ color }: { color: string }) => (
+  <View style={[styles.colorIndicator, { backgroundColor: color }]} />
+));
+ColorIndicator.displayName = 'ColorIndicator';
+
+// Memoized habit list item component
+interface HabitListItemProps {
+  habit: Habit;
+  isCompleted: boolean;
+  isToggling: boolean;
+  onToggle: (habitId: string) => void;
+}
+
+const HabitListItem = memo(({ habit, isCompleted, isToggling, onToggle }: HabitListItemProps) => {
+  return (
+    <List.Item
+      key={habit.id}
+      title={habit.name}
+      description={habit.description || habit.category || undefined}
+      left={() => <ColorIndicator color={habit.color} />}
+      right={() => (
+        <IconButton
+          icon={isCompleted ? 'check-circle' : 'checkbox-blank-circle-outline'}
+          iconColor={habit.color}
+          size={24}
+          onPress={() => onToggle(habit.id)}
+          disabled={isToggling}
+        />
+      )}
+      style={styles.listItem}
+    />
+  );
+});
+HabitListItem.displayName = 'HabitListItem';
 
 export default function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -79,23 +108,22 @@ export default function HabitsScreen() {
     setShowEmojiRain(true);
   }, []);
 
-  const loadHabits = useCallback(async (date: string) => {
-    console.log('[loadHabits] Starting with date:', date);
+  // Use ref to store loadHabits function to avoid useEffect dependency issues
+  const loadHabitsRef = useRef<(date: string) => Promise<void>>();
+
+  loadHabitsRef.current = async (date: string) => {
     try {
       const data = await getHabits();
       setHabits(data);
-      console.log('[loadHabits] Loaded habits:', data.length);
       
       // Load completions for each habit to check which are completed for the selected date
       const completedSet = new Set<string>();
       for (const habit of data) {
         try {
           const completions = await getHabitCompletions(habit.id);
-          console.log(`[loadHabits] Habit ${habit.name} (${habit.id}) completions:`, completions);
           const isCompleted = completions.some((completion) => 
             isCompletionForDate(completion.completed_at, date)
           );
-          console.log(`[loadHabits] Habit ${habit.name} isCompleted for ${date}:`, isCompleted);
           if (isCompleted) {
             completedSet.add(habit.id);
           }
@@ -104,8 +132,6 @@ export default function HabitsScreen() {
           console.warn(`Failed to load completions for habit ${habit.id}:`, error);
         }
       }
-      console.log('[loadHabits] Completed habits set:', Array.from(completedSet));
-      console.log('[loadHabits] Setting completedHabits state with', completedSet.size, 'habits');
       setCompletedHabits(completedSet);
     } catch (error) {
       setSnackbarMessage(error instanceof Error ? error.message : 'Erro ao carregar hábitos');
@@ -114,19 +140,17 @@ export default function HabitsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    console.log('[useEffect] selectedDate changed to:', selectedDate);
-    console.log('[useEffect] Clearing completedHabits before loading');
     setCompletedHabits(new Set()); // Clear previous state immediately
-    loadHabits(selectedDate);
-  }, [loadHabits, selectedDate]);
+    loadHabitsRef.current?.(selectedDate);
+  }, [selectedDate]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    loadHabits(selectedDate);
-  }, [loadHabits, selectedDate]);
+    loadHabitsRef.current?.(selectedDate);
+  }, [selectedDate]);
 
   const handleCreateHabit = async (data: {
     name: string;
@@ -162,7 +186,7 @@ export default function HabitsScreen() {
     }
   };
 
-  const handleToggleComplete = async (habitId: string) => {
+  const handleToggleComplete = useCallback(async (habitId: string) => {
     if (togglingIds.has(habitId)) return;
 
     const isCompleted = completedHabits.has(habitId);
@@ -212,29 +236,19 @@ export default function HabitsScreen() {
         return next;
       });
     }
-  };
+  }, [completedHabits, togglingIds, selectedDate, triggerCelebration]);
 
-  const handlePreviousDay = () => {
-    setSelectedDate((prev) => {
-      const newDate = addDays(prev, -1);
-      console.log('[handlePreviousDay] Changing date from', prev, 'to', newDate);
-      return newDate;
-    });
-  };
+  const handlePreviousDay = useCallback(() => {
+    setSelectedDate((prev) => addDays(prev, -1));
+  }, []);
 
-  const handleNextDay = () => {
-    const today = getTodayDate();
-    const nextDate = addDays(selectedDate, 1);
-    console.log('[handleNextDay] Changing date from', selectedDate, 'to', nextDate);
-    // Allow navigation to future dates (no limit for now)
-    setSelectedDate(nextDate);
-  };
+  const handleNextDay = useCallback(() => {
+    setSelectedDate((prev) => addDays(prev, 1));
+  }, []);
 
-  const handleGoToToday = () => {
-    const today = getTodayDate();
-    console.log('[handleGoToToday] Changing date from', selectedDate, 'to', today);
-    setSelectedDate(today);
-  };
+  const handleGoToToday = useCallback(() => {
+    setSelectedDate(getTodayDate());
+  }, []);
 
   const isTodaySelected = isDateToday(selectedDate);
 
@@ -299,27 +313,12 @@ export default function HabitsScreen() {
           </View>
         ) : (
           habits.map((habit) => (
-            <List.Item
+            <HabitListItem
               key={habit.id}
-              title={habit.name}
-              description={habit.description || habit.category || undefined}
-              left={(props) => (
-                <View style={[styles.colorIndicator, { backgroundColor: habit.color }]} />
-              )}
-              right={(props) => {
-                const isCompleted = completedHabits.has(habit.id);
-                console.log(`[Render] Habit ${habit.name} (${habit.id}) - isCompleted: ${isCompleted}, selectedDate: ${selectedDate}`);
-                return (
-                  <IconButton
-                    icon={isCompleted ? 'check-circle' : 'checkbox-blank-circle-outline'}
-                    iconColor={habit.color}
-                    size={24}
-                    onPress={() => handleToggleComplete(habit.id)}
-                    disabled={togglingIds.has(habit.id)}
-                  />
-                );
-              }}
-              style={styles.listItem}
+              habit={habit}
+              isCompleted={completedHabits.has(habit.id)}
+              isToggling={togglingIds.has(habit.id)}
+              onToggle={handleToggleComplete}
             />
           ))
         )}
