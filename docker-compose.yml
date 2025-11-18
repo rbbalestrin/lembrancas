@@ -52,7 +52,6 @@ services:
       - ./lembrancas:/app
       - /app/node_modules
     environment:
-      - EXPO_PUBLIC_API_URL=http://localhost:8080/api
       - NODE_ENV=development
     depends_on:
       api:

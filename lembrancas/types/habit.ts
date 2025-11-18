@@ -35,3 +35,10 @@ export interface ApiError {
   error: string;
 }
 
+export interface HabitStatistics {
+  total_completions: number;
+  current_streak: number;
+  longest_streak: number;
+  completions: string[];
+}
+

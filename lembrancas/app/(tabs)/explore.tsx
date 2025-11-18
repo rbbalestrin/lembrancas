@@ -1,112 +1,331 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { getHabits, getHabitStatistics } from '@/services/api';
+import { Habit, HabitStatistics } from '@/types/habit';
+import React, { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Card, Text, Surface, List } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+interface HabitWithStats {
+  habit: Habit;
+  statistics: HabitStatistics;
+}
 
-export default function TabTwoScreen() {
+export default function StatisticsScreen() {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [habitsWithStats, setHabitsWithStats] = useState<HabitWithStats[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadStatistics = useCallback(async () => {
+    try {
+      setError(null);
+      const habits = await getHabits();
+      
+      // Load statistics for each habit
+      const statsPromises = habits.map(async (habit) => {
+        try {
+          const statistics = await getHabitStatistics(habit.id);
+          return { habit, statistics };
+        } catch (err) {
+          console.error(`Error loading stats for habit ${habit.id}:`, err);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(statsPromises);
+      const validResults = results.filter((r): r is HabitWithStats => r !== null);
+      setHabitsWithStats(validResults);
+    } catch (err) {
+      console.error('Error loading statistics:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar estatísticas');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStatistics();
+  }, [loadStatistics]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadStatistics();
+  }, [loadStatistics]);
+
+  // Calculate total statistics
+  const totalStats = habitsWithStats.reduce(
+    (acc, { statistics }) => ({
+      totalCompletions: acc.totalCompletions + statistics.total_completions,
+      maxStreak: Math.max(acc.maxStreak, statistics.longest_streak),
+      activeHabits: statistics.current_streak > 0 ? acc.activeHabits + 1 : acc.activeHabits,
+    }),
+    { totalCompletions: 0, maxStreak: 0, activeHabits: 0 }
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator animating={true} size="large" />
+          <Text style={styles.loadingText}>Carregando estatísticas...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text variant="headlineMedium" style={styles.title}>
+          Estatísticas
+        </Text>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
+        {error && (
+          <Card style={styles.errorCard}>
+            <Card.Content>
+              <Text variant="bodyMedium" style={styles.errorText}>
+                {error}
+              </Text>
+            </Card.Content>
+          </Card>
+        )}
+
+        {habitsWithStats.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <List.Icon icon="chart-bar" />
+            <Text variant="bodyLarge" style={styles.emptyText}>
+              Nenhuma estatística disponível
+            </Text>
+            <Text variant="bodyMedium" style={styles.emptySubtext}>
+              Complete alguns hábitos para ver suas estatísticas
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Overall Statistics */}
+            <Card style={styles.card}>
+              <Card.Content>
+                <Text variant="titleLarge" style={styles.cardTitle}>
+                  Resumo Geral
+                </Text>
+                <View style={styles.statsGrid}>
+                  <Surface style={styles.statBox} elevation={1}>
+                    <Text variant="displaySmall" style={styles.statNumber}>
+                      {totalStats.totalCompletions}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.statLabel}>
+                      Total de Conclusões
+                    </Text>
+                  </Surface>
+                  <Surface style={styles.statBox} elevation={1}>
+                    <Text variant="displaySmall" style={styles.statNumber}>
+                      {totalStats.maxStreak}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.statLabel}>
+                      Maior Sequência
+                    </Text>
+                  </Surface>
+                  <Surface style={styles.statBox} elevation={1}>
+                    <Text variant="displaySmall" style={styles.statNumber}>
+                      {totalStats.activeHabits}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.statLabel}>
+                      Hábitos Ativos
+                    </Text>
+                  </Surface>
+                  <Surface style={styles.statBox} elevation={1}>
+                    <Text variant="displaySmall" style={styles.statNumber}>
+                      {habitsWithStats.length}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.statLabel}>
+                      Total de Hábitos
+                    </Text>
+                  </Surface>
+                </View>
+              </Card.Content>
+            </Card>
+
+            {/* Per-Habit Statistics */}
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Por Hábito
+            </Text>
+            {habitsWithStats.map(({ habit, statistics }) => (
+              <Card key={habit.id} style={styles.habitCard}>
+                <Card.Content>
+                  <View style={styles.habitHeader}>
+                    <View style={[styles.colorIndicator, { backgroundColor: habit.color }]} />
+                    <View style={styles.habitInfo}>
+                      <Text variant="titleMedium">{habit.name}</Text>
+                      {habit.category && (
+                        <Text variant="bodySmall" style={styles.category}>
+                          {habit.category}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.habitStatsRow}>
+                    <View style={styles.habitStat}>
+                      <Text variant="headlineSmall" style={styles.habitStatNumber}>
+                        {statistics.total_completions}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.habitStatLabel}>
+                        Conclusões
+                      </Text>
+                    </View>
+                    <View style={styles.habitStat}>
+                      <Text variant="headlineSmall" style={styles.habitStatNumber}>
+                        {statistics.current_streak}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.habitStatLabel}>
+                        Sequência Atual
+                      </Text>
+                    </View>
+                    <View style={styles.habitStat}>
+                      <Text variant="headlineSmall" style={styles.habitStatNumber}>
+                        {statistics.longest_streak}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.habitStatLabel}>
+                        Melhor Sequência
+                      </Text>
+                    </View>
+                  </View>
+                </Card.Content>
+              </Card>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  titleContainer: {
+  header: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    marginTop: 8,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  errorCard: {
+    margin: 16,
+    backgroundColor: '#ffebee',
+  },
+  errorText: {
+    color: '#c62828',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    marginTop: 64,
+  },
+  emptyText: {
+    marginTop: 16,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  emptySubtext: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#666',
+  },
+  card: {
+    margin: 16,
+    marginBottom: 8,
+  },
+  cardTitle: {
+    marginBottom: 16,
+    fontWeight: 'bold',
+  },
+  statsGrid: {
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statBox: {
+    flex: 1,
+    minWidth: '45%',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  statNumber: {
+    fontWeight: 'bold',
+    color: '#6200ee',
+  },
+  statLabel: {
+    marginTop: 4,
+    textAlign: 'center',
+    color: '#666',
+  },
+  sectionTitle: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  habitCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  habitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  colorIndicator: {
+    width: 4,
+    height: 40,
+    borderRadius: 2,
+    marginRight: 12,
+  },
+  habitInfo: {
+    flex: 1,
+  },
+  category: {
+    marginTop: 2,
+    color: '#666',
+  },
+  habitStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  habitStat: {
+    alignItems: 'center',
+  },
+  habitStatNumber: {
+    fontWeight: 'bold',
+    color: '#6200ee',
+  },
+  habitStatLabel: {
+    marginTop: 4,
+    color: '#666',
   },
 });

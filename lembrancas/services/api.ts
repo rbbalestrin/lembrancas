@@ -1,6 +1,33 @@
-import { Habit, CreateHabitRequest, CompleteHabitRequest, ApiError, HabitCompletion } from '@/types/habit';
+import { Habit, CreateHabitRequest, CompleteHabitRequest, ApiError, HabitCompletion, HabitStatistics } from '@/types/habit';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+// Get API URL from environment variable or use default based on platform
+const getApiBaseUrl = (): string => {
+  // First, try to get from environment variable
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // Fallback: use localhost for web, host machine IP for mobile
+  if (Platform.OS === 'web') {
+    return 'http://localhost:8080/api';
+  }
+  
+  // For mobile (iOS/Android), use the host machine's IP
+  // You can get this from Constants.expoConfig?.hostUri or set it manually
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(':')[0];
+    return `http://${host}:8080/api`;
+  }
+  
+  // Final fallback (shouldn't reach here normally)
+  return 'http://localhost:8080/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -82,5 +109,10 @@ export async function removeCompletion(id: string, date: string): Promise<void> 
     const error: ApiError = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(error.error || `HTTP error! status: ${response.status}`);
   }
+}
+
+export async function getHabitStatistics(id: string): Promise<HabitStatistics> {
+  const response = await fetch(`${API_BASE_URL}/habits/${id}/statistics`);
+  return handleResponse<HabitStatistics>(response);
 }
 
