@@ -83,3 +83,7 @@ logs/
 # OS
 Thumbs.db
 
+# Documentation (except README)
+*.md
+!README.md
+

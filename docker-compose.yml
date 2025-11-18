@@ -1,3 +1,17 @@
+# ========================================
+# LEMBRANCAS - Docker Compose
+# ========================================
+# 
+# Para iniciar: docker compose up -d
+# Ver QR Code: .\show-qrcode.ps1 (Windows) ou ./show-qrcode.sh (Linux/Mac)
+# Ver logs: docker compose logs -f frontend
+#
+# Portas:
+#   - API: http://localhost:8080
+#   - Web: http://localhost:8081
+#   - Expo: http://localhost:19000
+# ========================================
+
 services:
   api:
     build:
@@ -7,10 +21,10 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Persist database file (will be created automatically if doesn't exist)
-      - ./lembrancas-api/habits.db:/app/habits.db
+      # Persist database in a data directory
+      - ./lembrancas-api/data:/data
     environment:
-      - DB_DSN=/app/habits.db
+      - DB_DSN=/data/habits.db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:8080/"]
@@ -26,10 +40,12 @@ services:
       context: ./lembrancas
       dockerfile: Dockerfile
     container_name: lembrancas-frontend
+    # Para ver o QR Code: .\show-qrcode.ps1 ou docker logs lembrancas-frontend --tail 40
     ports:
       - "19000:19000"
       - "19001:19001"
       - "19002:19002"
+      - "19006:19006"
       - "8081:8081"
     volumes:
       # Mount source code for hot reload

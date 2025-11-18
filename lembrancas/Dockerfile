@@ -16,5 +16,5 @@ COPY . .
 
 EXPOSE 19000 19001 19002 8081
 
-CMD ["npx", "expo", "start", "--web", "--host", "tunnel"]
+CMD ["npx", "expo", "start", "--web"]
 
