@@ -10,7 +10,7 @@ services:
       # Persist database file
       - ./lembrancas-api/habits.db:/app/habits.db
     environment:
-      - DB_DSN=habits.db
+      - DB_DSN=/app/habits.db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:8080/"]

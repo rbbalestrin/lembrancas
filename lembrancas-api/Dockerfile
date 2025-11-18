@@ -26,10 +26,12 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /app/api .
 
-# Copy database file if it exists (optional, for persistence)
-# The database will be created if it doesn't exist
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 8080
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["./api"]
 
