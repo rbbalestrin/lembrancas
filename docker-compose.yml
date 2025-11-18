@@ -7,7 +7,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Persist database file
+      # Persist database file (will be created automatically if doesn't exist)
       - ./lembrancas-api/habits.db:/app/habits.db
     environment:
       - DB_DSN=/app/habits.db
